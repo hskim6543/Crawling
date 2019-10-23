@@ -1,2 +1,2 @@
-# Crawling
-Consumer trend extraction by website crawling
+# Wadiz Crawling
+Consumer trend extraction by Wadiz website crawling
