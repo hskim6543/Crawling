@@ -10,11 +10,24 @@ from IPython.core.interactiveshell import InteractiveShell
 from types import SimpleNamespace
 InteractiveShell.ast_node_interactivity = "all"
 
+### Webdriver Chrome Options
+options = WD.ChromeOptions()
+options.add_argument('headless')
+options.add_argument('--disable-gpu')
+options.add_argument('window-size=1920x1080')
+options.add_argument('lang=ko_KR')
+options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+    AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36''')
+
+order='popluar' # sitePath: not typo
+catDic = {'전체보기':'','테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
+          '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
+          '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
+          '게임·취미':292,'출판':293,'기부·후원':312}
+
 main = ['url','iRank','serial','img']
-info = ['timestamp','category','title','summary','percent','amount',
-        'target','sDate','eDate','supporter','like','share','maker'
-       #, item
-       ]
+info = ['timestamp','category','title','summary','percent','amount', # item,
+        'target','sDate','eDate','supporter','like','share','maker']
 contact = ['sDate','eDate','maker','mail','phone','contactName','contactLink']
 social = ['facebook','instagram','twitter']
 website = ['site1','site2']
@@ -25,25 +38,18 @@ nC = re.compile('\D')
 
 def crawl_wadiz(driverPath, url_wadiz):
 
-    def crawl_url_wadiz(url_wadiz, driver):
+    def crawl_wadiz_url(url_wadiz, driver):
         l_url=[]; l_iRank=[]; l_serial=[]; l_img=[]
         iDic = dict()
-        
+
         driver.get(url_wadiz)
-        pageTitle = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR,
-                '''#main-app > div.MainWrapper_content__GZkTa > div >
-                   div.RewardCollectionVisual_container__3vwn9 >
-                   div.RewardCollectionVisual_text__28weX >
-                   p.RewardCollectionVisual_title__31bqJ'''))).text
-        print(f"▶ Page: \'{pageTitle}\': ", end='')
         driver.execute_script("window.scrollTo(0, 250)")
         wait = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR,
                 '''#main-app > div.MainWrapper_content__GZkTa > div > 
                    div.RewardProjectListApp_container__1ZYeD > 
                    div.ProjectCardList_container__3Y14k >
-                   div > div:nth-child(30)''')))
+                   div''')))
         e_url = driver.find_elements_by_xpath(
                 "//div[@class='ProjectCardList_item__1owJa']/div/a")
         i = 1
@@ -60,14 +66,15 @@ def crawl_wadiz(driverPath, url_wadiz):
                 f'window.scrollTo(0, {250 + 350 * len(l_img)//3})')
             driver.implicitly_wait(0.5)
             i +=1
-        
+            if i > 30:
+                break
+
         for k in main:
             iDic[k] = locals()[f'l_{k}']
-        print(f"{len(l_url)}개 ┐\n{'└ ': >46}<{crawlDT:%Y-%m-%d %H:%M}>")
-        
+
         return iDic
         
-    def crawl_page_wadiz(iDic, driver, j):
+    def crawl_wadiz_page(iDic, driver, j):
         rw_name=[]; rw_price=[]; rw_limit=[]; rw_sold=[]
         wDic = {'site1':'-', 'site2':'-'}
         itemInfo = dict()
@@ -153,9 +160,9 @@ def crawl_wadiz(driverPath, url_wadiz):
             'p.sub-title > button').click()
         e_contact = e_maker.find_element_by_css_selector(
             'div.contact-detail-info')
-        mail = e_contact.find_element_by_css_selector('p.mail > a')
+        mail = e_contact.find_element_by_css_selector('p.mail > a').text
         phone = int(nC.sub('',e_contact.find_element_by_css_selector(
-            'p.phone > a')))
+            'p.phone > a').text))
 
       # Contact_etc.: Name, Link
         try:
@@ -228,6 +235,7 @@ def crawl_wadiz(driverPath, url_wadiz):
         return df_item, df_maker
 
   ### Main Control
+    c_iDic = dict()
     df_items = pd.DataFrame()
     df_makers = pd.DataFrame()
 
@@ -236,17 +244,23 @@ def crawl_wadiz(driverPath, url_wadiz):
     print(f"▶ URL : \'{url_wadiz}\'")
 
     try:
-        driver = WD.Chrome(driverPath)
+        driver = WD.Chrome(driverPath, chrome_options = options)
         driver.maximize_window()
         driver.set_page_load_timeout(180)
         driver.implicitly_wait(2)
         crawlDT = datetime.now()
-        iDic = crawl_url_wadiz(url_wadiz, driver)
-#         n = len(iDic['url'])
-        n = 3
+            
+        for c in catDic.keys():
+            c_url = f'{url}{catDic[c]}?order={order}'
+            c_iDic[c] = pd.DataFrame(crawl_wadiz_url(c_url, driver), index='serial')
+            print(f'{c}: {len(c_iDic[c].index)}개')
+######## c_iDic
+
+#         iDic = crawl_wadiz_url(url_wadiz, driver)
+        n = len(iDic['url'])
 
         for j in range(n):
-            df_item, df_maker = crawl_page_wadiz(iDic, driver, j)
+            df_item, df_maker = crawl_wadiz_page(iDic, driver, j)
             df_items = pd.concat([df_items,df_item])
             
             df_makers = pd.concat([df_makers,df_maker]).sort_values(['sDate'])
@@ -262,7 +276,7 @@ def crawl_wadiz(driverPath, url_wadiz):
         f_m = len(df_makers.maker) == len(set(df_items.maker))
         
         if not f_i:
-            print(f'Error: {len(set(df_items.index()))}/{n} collected.')
+            print(f'Error: {len(set(df_items.index))}/{n} collected.')
         if not f_m:
             print(f'Error: {set(df_items.maker)-set(df_makers.maker)} missed.')
             
@@ -272,15 +286,18 @@ def crawl_wadiz(driverPath, url_wadiz):
         
     return df_items, df_makers, crawlDT
 
+
 #### Operation
 driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
 csvPath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/'
-url_wadiz = 'https://www.wadiz.kr/web/wreward/collection/wadizpick'
+# url_plan = 'https://www.wadiz.kr/web/wreward/collection/wadizpick'
+url_items = 'https://www.wadiz.kr/web/wreward/category/'
 
 if __name__ == '__main__':
-    df_items, df_makers, crawlDT = crawl_wadiz(driverPath, url_wadiz)
-#     fileName = f'R_{crawlDT:%y%m%d_%H%M}_Wadiz.xlsx'
-    with pd.ExcelWriter(f'{csvPath}R_wadiz.xlsx') as writer:
+    df_items, df_makers, crawlDT = crawl_wadiz(driverPath, url_items)   
+    xlsx = f'{csvPath}R_{crawlDT:%y%m%d_%H%M}_Wadiz.xlsx'
+
+    with pd.ExcelWriter(xlsx) as writer:
         df_items.to_excel(writer,
             sheet_name = 'R_item', 
             header = True, 
@@ -300,4 +317,4 @@ if __name__ == '__main__':
             freeze_panes = (2, 0),
             encoding='ms949')
 
-    print(f"\n\'R_{crawlDT:%y%m%d_%H%M}_Wadiz.xlsx\' file saved.")
+    print(f"\nfile: {xlsx} saved.")
