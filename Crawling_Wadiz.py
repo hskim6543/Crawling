@@ -20,15 +20,17 @@ options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36''')
 
 order='popluar' # sitePath: not typo
-catDic = {'전체보기':'','테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
+catDic = {# '전체보기':'',
+          '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
-          '게임·취미':292,'출판':293,'기부·후원':312}
+          '게임·취미':292,'출판':293,'기부·후원':312
+         }
 
-main = ['serial','category','iRank','title','maker','url','img']
+main = ['serial','img','category','iRank','title','url','maker']
 info = ['timestamp','summary','percent','amount', # item,
         'target','sDate','eDate','supporter','like','share']
-contact = ['sDate','eDate','maker','mail','phone','contactName','contactLink']
+contact = ['sDate','eDate','mail','phone','contactName','contactLink']
 social = ['facebook','instagram','twitter']
 website = ['site1','site2']
 reward = ['rw_name','rw_price','rw_limit','rw_sold']
@@ -36,55 +38,55 @@ reward = ['rw_name','rw_price','rw_limit','rw_sold']
 tC = re.compile('[^ 0-9a-zㄱ-ㅣ가-힣]+', re.I)
 nC = re.compile('\D')
 
-def crawl_wadiz(driverPath, url_wadiz):
+def crawl_wadiz(driverPath, url_items, k):
 
-    def crawl_wadiz_url(url_wadiz, driver):
+    def crawl_wadiz_url(url, driver, k):
         iDic = {m: [] for m in main}; i = 1
+        # k: 페이지당 수집 상품 수
 
-        driver.get(url_wadiz)
-        driver.execute_script("window.scrollTo(0, 250)")
-        wait = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR,
-                '''#main-app > div.MainWrapper_content__GZkTa > div > 
-                   div.RewardProjectListApp_container__1ZYeD > 
-                   div.ProjectCardList_container__3Y14k >
-                   div.ProjectCardList_list__1YBa2''')))
+        driver.get(url)
+        driver.execute_script('window.scrollTo(0, 250)')
         e_url = driver.find_elements_by_xpath(
                 "//div[@class='ProjectCardList_item__1owJa']/div")
         
         for e in e_url:
+            wait = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, f'''#main-app > div.MainWrapper_content__GZkTa >
+            div > div.RewardProjectListApp_container__1ZYeD > 
+            div.ProjectCardList_container__3Y14k > div.ProjectCardList_list__1YBa2 > 
+            div:nth-child({i}) > div > a > div > span''')))
             iRank = i
             serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
-            
+    
             imgTag = e.find_element_by_xpath('a/div/span').get_attribute('style')
             img = imgTag[imgTag.index('url(')+5:-3]
+            
             textTag = e.find_element_by_css_selector(
                 'div > div > div.RewardProjectCard_infoTop__1fX7c')
-
             url = textTag.find_element_by_xpath('a').get_attribute('href')
-            title = textTag.find_element_by_xpath('a/p/strong').text
+            title = tC.sub('',textTag.find_element_by_xpath('a/p/strong').text)
             category = textTag.find_element_by_xpath('div/span[1]').text
-            maker = textTag.find_element_by_xpath('div/span[2]').text
-
-            driver.execute_script(
-                f'window.scrollTo(0, {250 + 350 * i//3})')
+            maker = tC.sub('',textTag.find_element_by_xpath('div/span[2]').text)
+            driver.execute_script(f'window.scrollTo(0, {250 + 350 * i//3})')
             driver.implicitly_wait(0.5)
             for m in main:
                 iDic[m].append(locals()[m])
             i +=1
-            if i > 10:
+            if i > k:
                 break
                 
         return iDic
         
-    def crawl_wadiz_page(iDic, driver, j):
+    def crawl_wadiz_page(c_iDic, driver, j):
         rw_name=[]; rw_price=[]; rw_limit=[]; rw_sold=[]
+        df_item = pd.DataFrame()
+        df_maker = pd.DataFrame()
         wDic = {'site1':'-', 'site2':'-'}
         itemInfo = dict()
         makerInfo = dict()
         
       # URL
-        url = iDic['url'][j]
+        url = c_iDic['url'][j]
         print(f"{j+1:-<15}\n  \'{url}\' crawling...")
         driver.get(url)
 
@@ -126,6 +128,9 @@ def crawl_wadiz(driverPath, url_wadiz):
             '''#campaign-support-signature > div >
                p.CampaignSupportSignature_count__2zlpi > strong''').text))
 
+      # Maker-info box
+        e_maker = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR,'div.maker-box')))
       # Website
         e_website = e_maker.find_elements_by_css_selector(
             'ul.website > li > a')
@@ -144,8 +149,6 @@ def crawl_wadiz(driverPath, url_wadiz):
         sNs = SimpleNamespace(**sDic)
 
       # Mail, Phone
-        e_maker = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR,'div.maker-box')))
         e_maker.find_element_by_css_selector(
             'p.sub-title > button').click()
         e_contact = e_maker.find_element_by_css_selector(
@@ -193,7 +196,7 @@ def crawl_wadiz(driverPath, url_wadiz):
         for r in reward:
             itemInfo[r] = locals()[r]
         for m in main:
-            itemInfo[m] = [iDic[m][j]] * len(rw_name)
+            itemInfo[m] = [c_iDic[m][j]] * len(rw_name)
         for i in info:
             itemInfo[i] = [locals()[i]] * len(rw_name)
         
@@ -204,6 +207,7 @@ def crawl_wadiz(driverPath, url_wadiz):
         df_item.rwNo = list(map(lambda x : int(x),df_item.rwNo))
             
     ## Maker Info. DataFrame
+        makerInfo['maker'] = [c_iDic['maker'][j]]
         for c in contact:
             makerInfo[c] = [locals()[c]]
         for s in social:
@@ -232,7 +236,7 @@ def crawl_wadiz(driverPath, url_wadiz):
 
     print('='*20)        
     print('[Wadiz Planned Items, Makers Crawling]')
-    print(f"▶ URL : \'{url_wadiz}\'")
+    print(f"▶ Base URL : \'{url_items}\'")
 
     try:
         driver = WD.Chrome(driverPath) # , chrome_options = options)
@@ -243,7 +247,7 @@ def crawl_wadiz(driverPath, url_wadiz):
             
         for c in catDic.keys():
             c_url = f'{url_items}{catDic[c]}?order={order}'
-            iDic = crawl_wadiz_url(c_url, driver)
+            iDic = crawl_wadiz_url(c_url, driver, k)
             print(f'{c} 완료')
             for m in main:
                 c_iDic[m] += iDic[m]
@@ -262,12 +266,11 @@ def crawl_wadiz(driverPath, url_wadiz):
     finally:
         driver.quit()
         print(f"\n{'=':=<20}")
-        df_items = df_items.set_index('serial')
-        f_i = len(set(df_items.index)) == n
+        f_n = len(set(df_items.url.drop_duplicates()))
         f_m = len(df_makers.maker) == len(set(df_items.maker))
         
-        if not f_i:
-            print(f'Error: {len(set(df_items.index))}/{n} collected.')
+        if not f_n == n:
+            print(f'Error: {f_n}/{n} collected.')
         elif not f_m:
             print(f'Error: {set(df_items.maker)-set(df_makers.maker)} missed.')
         elif f_i * f_m:
@@ -276,24 +279,23 @@ def crawl_wadiz(driverPath, url_wadiz):
         
     return df_items, df_makers, crawlDT
 
-
 #### Operation
 driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
 csvPath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/'
 # url_plan = 'https://www.wadiz.kr/web/wreward/collection/wadizpick'
 url_items = 'https://www.wadiz.kr/web/wreward/category/'
+k = 20
 
 if __name__ == '__main__':
-    df_items, df_makers, crawlDT = crawl_wadiz(driverPath, url_items)   
+    df_items, df_makers, crawlDT = crawl_wadiz(driverPath, url_items, k)   
     xlsx = f'{csvPath}R_{crawlDT:%y%m%d_%H%M}_Wadiz.xlsx'
 
     with pd.ExcelWriter(xlsx) as writer:
         df_items.to_excel(writer,
             sheet_name = 'R_item', 
             header = True, 
-            columns = ['iRank',*info,*reward,'url','img'],
-            index = True, 
-            index_label = 'serial', 
+            columns = [*main,*info,*reward],
+            index = False, 
             startrow = 1, 
             freeze_panes = (2, 0),
             encoding='ms949')
@@ -301,7 +303,7 @@ if __name__ == '__main__':
         df_makers.to_excel(writer,
             sheet_name = 'R_maker', 
             header = True, 
-            columns = [*contact,*social,*website],
+            columns = ['maker',*contact,*social,*website],
             index = True,
             startrow = 1, 
             freeze_panes = (2, 0),
