@@ -25,9 +25,9 @@ catDic = {'전체보기':'','테크·가전':287,'패션·잡화':288,'뷰티':3
           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
           '게임·취미':292,'출판':293,'기부·후원':312}
 
-main = ['url','iRank','serial','img']
-info = ['timestamp','category','title','summary','percent','amount', # item,
-        'target','sDate','eDate','supporter','like','share','maker']
+main = ['serial','category','iRank','title','maker','url','img']
+info = ['timestamp','summary','percent','amount', # item,
+        'target','sDate','eDate','supporter','like','share']
 contact = ['sDate','eDate','maker','mail','phone','contactName','contactLink']
 social = ['facebook','instagram','twitter']
 website = ['site1','site2']
@@ -39,8 +39,7 @@ nC = re.compile('\D')
 def crawl_wadiz(driverPath, url_wadiz):
 
     def crawl_wadiz_url(url_wadiz, driver):
-        l_url=[]; l_iRank=[]; l_serial=[]; l_img=[]
-        iDic = dict()
+        iDic = {m: [] for m in main}; i = 1
 
         driver.get(url_wadiz)
         driver.execute_script("window.scrollTo(0, 250)")
@@ -49,29 +48,33 @@ def crawl_wadiz(driverPath, url_wadiz):
                 '''#main-app > div.MainWrapper_content__GZkTa > div > 
                    div.RewardProjectListApp_container__1ZYeD > 
                    div.ProjectCardList_container__3Y14k >
-                   div''')))
+                   div.ProjectCardList_list__1YBa2''')))
         e_url = driver.find_elements_by_xpath(
-                "//div[@class='ProjectCardList_item__1owJa']/div/a")
-        i = 1
+                "//div[@class='ProjectCardList_item__1owJa']/div")
+        
         for e in e_url:
-            l_url.append(e.get_attribute('href'))
-            l_iRank.append(i)
-            l_serial.append(f'{crawlDT:%y%m%d%H%M}-{i:0>2}')
-            imgTag = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,
-                 'div.CommonProjectCard_rect__3A4Yf > span')
-                )).get_attribute('style')
-            l_img.append(imgTag[imgTag.index('image: url(')+12:-3])
+            iRank = i
+            serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
+            
+            imgTag = e.find_element_by_xpath('a/div/span').get_attribute('style')
+            img = imgTag[imgTag.index('url(')+5:-3]
+            textTag = e.find_element_by_css_selector(
+                'div > div > div.RewardProjectCard_infoTop__1fX7c')
+
+            url = textTag.find_element_by_xpath('a').get_attribute('href')
+            title = textTag.find_element_by_xpath('a/p/strong').text
+            category = textTag.find_element_by_xpath('div/span[1]').text
+            maker = textTag.find_element_by_xpath('div/span[2]').text
+
             driver.execute_script(
-                f'window.scrollTo(0, {250 + 350 * len(l_img)//3})')
+                f'window.scrollTo(0, {250 + 350 * i//3})')
             driver.implicitly_wait(0.5)
+            for m in main:
+                iDic[m].append(locals()[m])
             i +=1
-            if i > 30:
+            if i > 10:
                 break
-
-        for k in main:
-            iDic[k] = locals()[f'l_{k}']
-
+                
         return iDic
         
     def crawl_wadiz_page(iDic, driver, j):
@@ -88,18 +91,9 @@ def crawl_wadiz(driverPath, url_wadiz):
       # Date, Time  
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-      # Title, Item, Category, Summary
-        e_title = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR,
-                'div.reward-header')))
-        # item = tC.sub('.',e_title.find_element_by_css_selector(
-        #     '#container > div.reward-header > p > em').text)        
-        category = tC.sub('',e_title.find_element_by_css_selector(
-            'div.reward-header > p.title-info > em').text)
-        title = tC.sub('',e_title.find_element_by_tag_name(
-            'div.reward-header > h2.title > a').text)
-        summary = tC.sub('',driver.find_element_by_class_name(
-            'campaign-summary').text)
+      # Summary
+        summary = tC.sub('',driver.find_element_by_css_selector(
+            'div.campaign-summary').text)
 
       # Period, Target
         e_obj = driver.find_element_by_css_selector(
@@ -132,12 +126,6 @@ def crawl_wadiz(driverPath, url_wadiz):
             '''#campaign-support-signature > div >
                p.CampaignSupportSignature_count__2zlpi > strong''').text))
 
-      # Maker
-        e_maker = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR,'div.maker-box')))
-        maker = tC.sub('',e_maker.find_element_by_css_selector(
-            'p.name').text)
-
       # Website
         e_website = e_maker.find_elements_by_css_selector(
             'ul.website > li > a')
@@ -156,13 +144,16 @@ def crawl_wadiz(driverPath, url_wadiz):
         sNs = SimpleNamespace(**sDic)
 
       # Mail, Phone
+        e_maker = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR,'div.maker-box')))
         e_maker.find_element_by_css_selector(
             'p.sub-title > button').click()
         e_contact = e_maker.find_element_by_css_selector(
             'div.contact-detail-info')
         mail = e_contact.find_element_by_css_selector('p.mail > a').text
-        phone = int(nC.sub('',e_contact.find_element_by_css_selector(
-            'p.phone > a').text))
+        ph = nC.sub('',e_contact.find_element_by_css_selector(
+            'p.phone > a').text)
+        phone = int(ph) if ph.isdecimal() else '-'
 
       # Contact_etc.: Name, Link
         try:
@@ -235,7 +226,7 @@ def crawl_wadiz(driverPath, url_wadiz):
         return df_item, df_maker
 
   ### Main Control
-    c_iDic = dict()
+    c_iDic = {m:[] for m in main}
     df_items = pd.DataFrame()
     df_makers = pd.DataFrame()
 
@@ -244,23 +235,23 @@ def crawl_wadiz(driverPath, url_wadiz):
     print(f"▶ URL : \'{url_wadiz}\'")
 
     try:
-        driver = WD.Chrome(driverPath, chrome_options = options)
+        driver = WD.Chrome(driverPath) # , chrome_options = options)
         driver.maximize_window()
         driver.set_page_load_timeout(180)
         driver.implicitly_wait(2)
         crawlDT = datetime.now()
             
         for c in catDic.keys():
-            c_url = f'{url}{catDic[c]}?order={order}'
-            c_iDic[c] = pd.DataFrame(crawl_wadiz_url(c_url, driver), index='serial')
-            print(f'{c}: {len(c_iDic[c].index)}개')
-######## c_iDic
+            c_url = f'{url_items}{catDic[c]}?order={order}'
+            iDic = crawl_wadiz_url(c_url, driver)
+            print(f'{c} 완료')
+            for m in main:
+                c_iDic[m] += iDic[m]
 
-#         iDic = crawl_wadiz_url(url_wadiz, driver)
-        n = len(iDic['url'])
+        n = len(c_iDic['url'])
 
         for j in range(n):
-            df_item, df_maker = crawl_wadiz_page(iDic, driver, j)
+            df_item, df_maker = crawl_wadiz_page(c_iDic, driver, j)
             df_items = pd.concat([df_items,df_item])
             
             df_makers = pd.concat([df_makers,df_maker]).sort_values(['sDate'])
@@ -277,10 +268,9 @@ def crawl_wadiz(driverPath, url_wadiz):
         
         if not f_i:
             print(f'Error: {len(set(df_items.index))}/{n} collected.')
-        if not f_m:
+        elif not f_m:
             print(f'Error: {set(df_items.maker)-set(df_makers.maker)} missed.')
-            
-        if f_i * f_m:
+        elif f_i * f_m:
             print('Items, Makers crawling complete.┐')
             print(f"{'└ ': >32}{crawlDT:<%Y-%m-%d %H:%M>}")
         
