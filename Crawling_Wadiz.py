@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -26,11 +23,11 @@ order='popluar' # sitePath: not typo
 catDic = {# '전체보기':'',
           '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
-#           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
+          '반려동물':308,'모임':313 #,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
 #           '게임·취미':292,'출판':293,'기부·후원':312
          }
 
-main = ['serial','img','category','iRank','title','url','maker']
+main = ['serial','category','iRank','img','title','url','maker']
 info = ['timestamp','summary','percent','amount', # item,
         'target','sDate','eDate','supporter','like','share']
 contact = ['sDate','eDate','mail','phone','contactName','contactLink']
@@ -59,7 +56,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
         for e in e_url:
             iRank = i
             serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
-            imgTag = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+            imgTag = WebDriverWait(driver,10).until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, f'{sel_cardList} > div:nth-child({i}) > div')))
             imgTag = e.find_element_by_xpath('a/div/span').get_attribute('style')
             img = imgTag[imgTag.index('url(')+5:-3]
@@ -78,6 +75,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
                 break
                 
         return iDic
+    
   #### Crawling Item Pages      
     def crawl_wadiz_page(c_iDic, driver, j):
         rw_name=[]; rw_price=[]; rw_limit=[]; rw_sold=[]
@@ -119,7 +117,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
                div.wd-ui-info-wrap > div.wd-ui-sub-opener-info >
                div.project-state-info > div.state-box''')))
         percent = int(nC.sub('',e_content.find_element_by_css_selector(
-            'p.achievement-rate > strong').text))
+            'p.achievement-rate > strong').text))/100
         amount = int(nC.sub('',e_content.find_element_by_css_selector(
             'p.total-amount > strong').text))
         supporter = int(nC.sub('',e_content.find_element_by_css_selector(
@@ -150,7 +148,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
             'ul.social > li > a')
         sDic = {e.get_attribute('class'):e.get_property(
             'href') for e in e_social}
-        sDic = {s: sDic[s] if s in sDic.keys() else '-' for s in social}
+        sDic = {s: sDic[s] if s in sDic.keys() else 0 for s in social}
         sNs = SimpleNamespace(**sDic)
 
       # Mail, Phone
@@ -186,16 +184,15 @@ def crawl_wadiz(driverPath, url_items, k=20):
             rw_price.append(int(nC.sub('',
                 rewardTag.find_element_by_css_selector('dt').text)))
             
-            if e.find_element_by_css_selector('p.reward-qty').text[6:8]=='모두':
-                qty = int(nC.sub('',e.find_element_by_css_selector(
+            qty = int(nC.sub('',e.find_element_by_css_selector(
                     'p.reward-soldcount > strong').text))
-                rw_limit.append(qty)
-                rw_sold.append(qty)
-            else:
+            rw_sold.append(qty)
+            result = e.find_element_by_xpath('p[1]').get_attribute('class')
+            if result == 'reward-qty':
                 rw_limit.append(int(nC.sub('',e.find_element_by_css_selector(
                     'p.reward-qty > strong').text)))
-                rw_sold.append(int(nC.sub('',e.find_element_by_css_selector(
-                    'p.reward-soldcount > strong').text)))
+            elif result == 'reward-qty soldout': rw_limit.append(qty)
+            elif result == 'reward-qty none': rw_limit.append('-')
 
      ## Item Info. DataFrame
         for r in reward:
@@ -239,25 +236,22 @@ def crawl_wadiz(driverPath, url_items, k=20):
     df_items = pd.DataFrame()
     df_makers = pd.DataFrame()
 
-    print('='*20)        
-    print('[Wadiz Planned Items, Makers Crawling]')
-    print(f"▶ Base URL : \'{url_items}\'")
-
     try:
         driver = WD.Chrome(driverPath) # , chrome_options = options)
         driver.maximize_window()
         driver.set_page_load_timeout(180)
         driver.implicitly_wait(2)
-        crawlDT = datetime.now()
-            
+        
+        print('-'*10)    
         for c in catDic.keys():
             c_url = f'{url_items}{catDic[c]}?order={order}'
             iDic = crawl_wadiz_url(c_url, driver, k)
-            print(f'{c}: {len(iDic['url'])}개')
+            print(f' - {c}: ',len(iDic['url']),'개',sep='')
             for m in main:
-                c_iDic[m] += iDic[m]
+                  c_iDic[m] += iDic[m]
 
         n = len(c_iDic['url'])
+        print(f'》 총 {n}개 상품')
 
         for j in range(n):
             df_item, df_maker = crawl_wadiz_page(c_iDic, driver, j)
@@ -278,9 +272,8 @@ def crawl_wadiz(driverPath, url_items, k=20):
             print(f'Error: {f_n}/{n} collected.')
         elif not f_m:
             print(f'Error: {set(df_items.maker)-set(df_makers.maker)} missed.')
-        elif f_i * f_m:
-            print('Items, Makers crawling complete.┐')
-            print(f"{'└ ': >32}{crawlDT:<%Y-%m-%d %H:%M>}")
+        elif f_n * f_m:
+            print('Items, Makers crawling completed.')
             
         xlsx = f'{filePath}R_{crawlDT:%y%m%d_%H%M}_Wadiz.xlsx'
         
@@ -295,7 +288,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
                 columns = ['maker',*contact,*social,*website],
                 startrow = 1, freeze_panes = (2, 0), encoding='ms949')
         
-        print(f"\nfile: {xlsx} saved.")
+        print(f"\nfile saved: {xlsx}")
 
 #### Operation
 driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
@@ -304,6 +297,12 @@ url_items = 'https://www.wadiz.kr/web/wreward/category/'
 # url_plan = 'https://www.wadiz.kr/web/wreward/collection/wadizpick'
 
 if __name__ == '__main__':
-    print(f'Chrome: {driverPath}')
-    print(f'Saving Directory: {filePath})
-    crawl_wadiz(driverPath, url_items, k = 20)
+    crawlDT = datetime.now()
+    
+    print('='*20,'\n[Wadiz Planned Items, Makers Crawling]┐')
+    print(f"{'└ ': >40}{crawlDT:<%Y-%m-%d %H:%M>}\n{'-':-<10}")
+    print(f"》 Base URL  : {url_items}")
+    print(f'》 Chrome Dir: {driverPath}')
+    print(f'》 Saving Dir: {filePath}')
+    
+    crawl_wadiz(driverPath, url_items, k = 15)
