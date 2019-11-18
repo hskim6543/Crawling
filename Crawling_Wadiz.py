@@ -57,7 +57,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         e_url = cardList.find_elements_by_xpath(
                 "div[@class='ProjectCardList_item__1owJa']/div")
         
-        for e in e_url if i<=k:
+        for e in e_url:
             iRank = i
             serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
             imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
@@ -75,6 +75,8 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             for m in main:
                 iDic[m].append(locals()[m])
             i +=1
+            if i > k:
+                break
                 
         return iDic
     
@@ -310,4 +312,3 @@ if __name__ == '__main__':
     print(f'》 Saving Dir: {filePath}')
     
     crawl_wadiz(driverPath, url_items, crawlDT, k = 15)
-          
