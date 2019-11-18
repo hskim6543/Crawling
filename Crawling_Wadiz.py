@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -23,22 +26,22 @@ order='popluar' # sitePath: not typo
 catDic = {# '전체보기':'',
           '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
-          '반려동물':308,'모임':313 #,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
-#           '게임·취미':292,'출판':293,'기부·후원':312
+          '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
+          '게임·취미':292,'출판':293,'기부·후원':312
          }
 
 main = ['serial','category','iRank','img','title','url','maker']
-info = ['timestamp','summary','percent','amount', # item,
+info = ['timestamp','summary','percent','amount',
         'target','sDate','eDate','supporter','like','share']
 contact = ['sDate','eDate','mail','phone','contactName','contactLink']
 social = ['facebook','instagram','twitter']
 website = ['site1','site2']
 reward = ['rw_name','rw_price','rw_limit','rw_sold']
 
-tC = re.compile('[^ 0-9a-zㄱ-ㅣ가-힣]+', re.I)
+tC = re.compile('[^ ·:0-9a-zㄱ-ㅣ가-힣]+', re.I)
 nC = re.compile('\D')
 
-def crawl_wadiz(driverPath, url_items, k=20):
+def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
   #### Crawling Category Pages (k items/page)
     def crawl_wadiz_url(url, driver, k):
         iDic = {m: [] for m in main}; i = 1
@@ -47,18 +50,19 @@ def crawl_wadiz(driverPath, url_items, k=20):
         driver.implicitly_wait(3)
         sel_cardList = '''#main-app > div.MainWrapper_content__GZkTa >
             div > div.RewardProjectListApp_container__1ZYeD >
-            div.ProjectCardList_container__3Y14k > div.ProjectCardList_list__1YBa2'''
+            div.ProjectCardList_container__3Y14k > 
+            div.ProjectCardList_list__1YBa2'''
         cardList = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, sel_cardList)))
         e_url = cardList.find_elements_by_xpath(
                 "div[@class='ProjectCardList_item__1owJa']/div")
         
-        for e in e_url:
+        for e in e_url if i<=k:
             iRank = i
             serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
-            imgTag = WebDriverWait(driver,10).until(EC.presence_of_element_located(
+            imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, f'{sel_cardList} > div:nth-child({i}) > div')))
-            imgTag = e.find_element_by_xpath('a/div/span').get_attribute('style')
+            imgTag = imgE.find_element_by_xpath('a/div/span').get_attribute('style')
             img = imgTag[imgTag.index('url(')+5:-3]
 
             textTag = e.find_element_by_css_selector(
@@ -71,8 +75,6 @@ def crawl_wadiz(driverPath, url_items, k=20):
             for m in main:
                 iDic[m].append(locals()[m])
             i +=1
-            if i > k:
-                break
                 
         return iDic
     
@@ -157,22 +159,24 @@ def crawl_wadiz(driverPath, url_items, k=20):
         e_contact = e_maker.find_element_by_css_selector(
             'div.contact-detail-info')
         mail = e_contact.find_element_by_css_selector('p.mail > a').text
-        ph = nC.sub('',e_contact.find_element_by_css_selector(
+        try:
+            phone = nC.sub('',e_contact.find_element_by_css_selector(
             'p.phone > a').text)
-        phone = int(ph) if ph.isdecimal() else '-'
+        except:
+            phone = '-'
 
       # Contact_etc.: Name, Link
         try:
             e_c_etc = e_contact.find_element_by_css_selector(
                 'p:nth-child(3)')
             contactName = tC.sub('',
-                e_c_etc.find_element_by_css_selector('span').text +'_'+
+                e_c_etc.find_element_by_css_selector('span').text +': '+
                 e_c_etc.find_element_by_css_selector('a').text)
             contactLink = e_c_etc.find_element_by_tag_name(
                 'a').get_property('href')
         except:
-            contactName = '-'
-            contactLink = '-'
+            contactName = 0
+            contactLink = 0
 
       # Reward: Name, Price, Limit_qty, Sold_qty
         e_reward = WebDriverWait(driver, 10).until(
@@ -192,7 +196,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
                 rw_limit.append(int(nC.sub('',e.find_element_by_css_selector(
                     'p.reward-qty > strong').text)))
             elif result == 'reward-qty soldout': rw_limit.append(qty)
-            elif result == 'reward-qty none': rw_limit.append('-')
+            elif result == 'reward-qty none': rw_limit.append(0)
 
      ## Item Info. DataFrame
         for r in reward:
@@ -251,7 +255,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
                   c_iDic[m] += iDic[m]
 
         n = len(c_iDic['url'])
-        print(f'》 총 {n}개 상품')
+        print(f'》 총 {n}개 상품\n')
 
         for j in range(n):
             df_item, df_maker = crawl_wadiz_page(c_iDic, driver, j)
@@ -292,7 +296,7 @@ def crawl_wadiz(driverPath, url_items, k=20):
 
 #### Operation
 driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
-filePath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/'
+filePath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/Daily/'
 url_items = 'https://www.wadiz.kr/web/wreward/category/'
 # url_plan = 'https://www.wadiz.kr/web/wreward/collection/wadizpick'
 
@@ -305,4 +309,5 @@ if __name__ == '__main__':
     print(f'》 Chrome Dir: {driverPath}')
     print(f'》 Saving Dir: {filePath}')
     
-    crawl_wadiz(driverPath, url_items, k = 15)
+    crawl_wadiz(driverPath, url_items, crawlDT, k = 15)
+          
