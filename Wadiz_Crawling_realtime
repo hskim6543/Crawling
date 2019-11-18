@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+from selenium import webdriver as WD
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
+import pandas as pd
+import re
+from os import path
+from IPython.core.interactiveshell import InteractiveShell
+InteractiveShell.ast_node_interactivity = "all"
+
+### Webdriver Chrome Options
+options = WD.ChromeOptions()
+options.add_argument('headless')
+options.add_argument('--disable-gpu')
+options.add_argument('window-size=1920x1080')
+options.add_argument('lang=ko_KR')
+options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+    AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36''')
+
+info = ['iRank','img','title','url','category','percent']
+tC = re.compile('[^ ·:0-9a-zㄱ-ㅣ가-힣]+', re.I)
+nC = re.compile('\D')
+
+def crawl_rankItems(driverPath, url_main, crawlDT):
+    df_ritem = pd.DataFrame()
+    tDic = {f: [] for f in info}; j = 1
+    print('-'*10)
+    try:
+        driver = WD.Chrome(driverPath, chrome_options = options)
+        driver.maximize_window()
+        driver.set_page_load_timeout(180)
+        driver.implicitly_wait(2)
+        driver.get(url_main)
+        driver.execute_script('window.scrollTo(0, 250);')
+
+        p_cont = '''//*[@id="main-app"]/div[2]/div/
+                    div[1]/div[2]/div[1]/div/section[2]/div'''
+        container = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
+                    (By.XPATH, p_cont)))
+        container.find_element_by_xpath('div[2]/div[1]/button[2]').click()
+
+        items = container.find_elements_by_css_selector(
+            'div.TabContainer_listItem__2XDgU')
+
+        for i in items:
+            iRank = j
+            url = i.find_element_by_css_selector('a').get_attribute('href')
+            imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
+                (By.XPATH, f'{p_cont}/div[2]/div[2]/div[{j}]/a/article/div[2]')))
+            imgTag = imgE.find_element_by_css_selector('span').get_attribute('style')
+            img = imgTag[imgTag.index(', url(')+7:-7]
+            title = tC.sub('',i.find_element_by_css_selector(
+                'h1.commons_title__1yGWm').text)
+
+            fundE = i.find_element_by_css_selector('p.commons_summary__2Ynez').text
+            category = tC.sub('',fundE.split('%')[1])
+            percent = int(nC.sub('',fundE.split('%')[0]))
+            for f in info:
+                tDic[f].append(locals()[f])
+            print(f'{j}. {title}')
+            j +=1
+            
+    finally:
+        driver.quit()
+        df_ritem = pd.DataFrame(tDic)
+        
+        print('-'*10)
+        if len(df_ritem) == 5:
+            print('Succeed in crawling main items')
+        else:
+            print(f'Error: {len(df_ritem)}/5 crawled')
+
+        df_ritem['timestamp'] = crawlDT.strftime('%Y-%m-%d %H:%M:%S')
+        df_ritem['serial'] = list(map(
+            lambda x: crawlDT.strftime('%y%m%d%H%M')+'_'+str(x+1), range(5)))
+        
+        csv = f'{filePath}R_Wadiz_rt_item.csv'
+        if path.isfile(csv):
+            df_ritem.to_csv(csv, columns = ['serial','timestamp',*info],
+                header = False, index = False, mode = 'a', encoding='ms949')
+        else:
+            df_ritem.to_csv(csv, columns = ['serial','timestamp',*info],
+                header = True, index = False, mode = 'w', encoding='ms949')
+
+        print(f"\nfile saved: {csv}\n{'=':=<20}")
+
+driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
+filePath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/Realtime/'
+url_main = 'https://www.wadiz.kr/web/main'
+
+if __name__ == '__main__':
+    crawlDT = datetime.now()
+    print('='*20,'\n[Wadiz Ranking Items Crawling]┐')
+    print(f"{'└ ': >32}{crawlDT:<%Y-%m-%d %H:%M>}\n{'-':-<10}")
+    print(f"》 Base URL  : {url_main}")
+    print(f'》 Chrome Dir: {driverPath}')
+    print(f'》 Saving Dir: {filePath}')
+    
+    df_ritem = crawl_rankItems(driverPath, url_main, crawlDT)
+
