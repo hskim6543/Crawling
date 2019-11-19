@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
+import time
 import pandas as pd
 import re
 from functools import reduce
@@ -27,8 +28,7 @@ catDic = {# '전체보기':'',
           '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
-          '게임·취미':292,'출판':293,'기부·후원':312
-         }
+          '게임·취미':292,'출판':293,'기부·후원':312}
 
 main = ['serial','category','iRank','img','title','url','maker']
 info = ['timestamp','summary','percent','amount',
@@ -47,7 +47,8 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         iDic = {m: [] for m in main}; i = 1
         # k: 페이지당 수집 상품 수
         driver.get(url)
-        driver.implicitly_wait(3)
+        driver.execute_script('window.scrollTo(0, 250)')
+        driver.implicitly_wait(5)
         sel_cardList = '''#main-app > div.MainWrapper_content__GZkTa >
             div > div.RewardProjectListApp_container__1ZYeD >
             div.ProjectCardList_container__3Y14k > 
@@ -72,6 +73,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             category = textTag.find_element_by_xpath('div/span[1]').text
             maker = tC.sub('',textTag.find_element_by_xpath('div/span[2]').text)
             driver.execute_script(f'window.scrollTo(0, {250 + 350 * i//3})')
+            time.sleep(1)
             for m in main:
                 iDic[m].append(locals()[m])
             i +=1
@@ -85,7 +87,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         rw_name=[]; rw_price=[]; rw_limit=[]; rw_sold=[]
         df_item = pd.DataFrame()
         df_maker = pd.DataFrame()
-        wDic = {'site1':'-', 'site2':'-'}
+        wDic = {'site1':0, 'site2':0}
         itemInfo = dict()
         makerInfo = dict()
         
@@ -312,3 +314,4 @@ if __name__ == '__main__':
     print(f'》 Saving Dir: {filePath}')
     
     crawl_wadiz(driverPath, url_items, crawlDT, k = 15)
+
