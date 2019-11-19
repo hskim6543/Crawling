@@ -164,8 +164,8 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             'div.contact-detail-info')
         mail = e_contact.find_element_by_css_selector('p.mail > a').text
         try:
-            phone = nC.sub('',e_contact.find_element_by_css_selector(
-            'p.phone > a').text)
+            phone = int(nC.sub('',e_contact.find_element_by_css_selector(
+            'p.phone > a').text))
         except:
             phone = '-'
 
@@ -245,7 +245,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
     df_makers = pd.DataFrame()
 
     try:
-        driver = WD.Chrome(driverPath) # , chrome_options = options)
+        driver = WD.Chrome(driverPath, chrome_options = options)
         driver.maximize_window()
         driver.set_page_load_timeout(180)
         driver.implicitly_wait(2)
