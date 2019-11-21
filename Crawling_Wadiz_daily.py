@@ -5,23 +5,27 @@ from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-import time
 import pandas as pd
 import re
 from functools import reduce
-from IPython.core.interactiveshell import InteractiveShell
 from types import SimpleNamespace
-InteractiveShell.ast_node_interactivity = "all"
+from IPython.core.interactiveshell import InteractiveShell
+InteractiveShell.ast_node_interactivity = "all" # for jupyter lab
 
 ### Webdriver Chrome Options
-options = WD.ChromeOptions()
-options.add_argument('headless')
+options = Options()
+options.add_argument('--headless')
 options.add_argument('--disable-gpu')
-options.add_argument('window-size=1920x1080')
-options.add_argument('lang=ko_KR')
+options.add_argument('--window-size=1920x1080')
+options.add_argument('--lang=ko_KR')
+options.add_argument('--use-fake-ui-for-media-stream') # for media access permission
+options.add_argument('--log-level=2') # to suppress info. logs
+# options.add_argument("--disable-logging")
 options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36''')
+ # to give the false appearance of real chrome user
 
 order='popluar' # sitePath: not typo
 catDic = {# '전체보기':'',
@@ -30,7 +34,7 @@ catDic = {# '전체보기':'',
           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
           '게임·취미':292,'출판':293,'기부·후원':312}
 
-main = ['serial','category','iRank','img','title','url','maker']
+main = ['serial','category','iRank','title','url','maker'] #'img'
 info = ['timestamp','summary','percent','amount',
         'target','sDate','eDate','supporter','like','share']
 contact = ['sDate','eDate','mail','phone','contactName','contactLink']
@@ -47,33 +51,28 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         iDic = {m: [] for m in main}; i = 1
         # k: 페이지당 수집 상품 수
         driver.get(url)
-        driver.execute_script('window.scrollTo(0, 250)')
-        driver.implicitly_wait(5)
-        sel_cardList = '''#main-app > div.MainWrapper_content__GZkTa >
-            div > div.RewardProjectListApp_container__1ZYeD >
-            div.ProjectCardList_container__3Y14k > 
-            div.ProjectCardList_list__1YBa2'''
-        cardList = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, sel_cardList)))
-        e_url = cardList.find_elements_by_xpath(
-                "div[@class='ProjectCardList_item__1owJa']/div")
-        
+        driver.execute_script(f'window.scrollTo(0, {250 + 350 * k//3})')
+        driver.implicitly_wait(3)
+        sel_cards = 'div.ProjectCardList_list__1YBa2'
+        cards = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, sel_cards+f'> div:nth-child({k}) > div > div')))
+        e_url = driver.find_elements_by_css_selector(
+            sel_cards + '> div.ProjectCardList_item__1owJa > div')
+     
         for e in e_url:
             iRank = i
             serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
-            imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, f'{sel_cardList} > div:nth-child({i}) > div')))
-            imgTag = imgE.find_element_by_xpath('a/div/span').get_attribute('style')
-            img = imgTag[imgTag.index('url(')+5:-3]
-
+#             imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
+#                 (By.CSS_SELECTOR, f'{sel_cards} > div:nth-child({i}) > div')))
+#             imgTag =imgE.find_element_by_xpath('a/div/span').get_attribute('style')
+#             img = imgTag[imgTag.index('url(')+5:-3]
             textTag = e.find_element_by_css_selector(
                 'div > div > div.RewardProjectCard_infoTop__1fX7c')
             url = textTag.find_element_by_xpath('a').get_attribute('href')
             title = tC.sub('',textTag.find_element_by_xpath('a/p/strong').text)
             category = textTag.find_element_by_xpath('div/span[1]').text
             maker = tC.sub('',textTag.find_element_by_xpath('div/span[2]').text)
-            driver.execute_script(f'window.scrollTo(0, {250 + 350 * i//3})')
-            time.sleep(1)
+
             for m in main:
                 iDic[m].append(locals()[m])
             i +=1
@@ -266,7 +265,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             df_items = pd.concat([df_items,df_item])
             
             df_makers = pd.concat([df_makers,df_maker]).sort_values(['sDate'])
-            df_makers = df_makers.drop_duplicates(['maker'],keep='last')
+            df_makers = df_makers.drop_duplicates(['maker'], keep='last')
             df_makers = df_makers.reset_index(drop=True)
             df_makers.index = df_makers.index + 1
 
@@ -314,4 +313,3 @@ if __name__ == '__main__':
     print(f'》 Saving Dir: {filePath}')
     
     crawl_wadiz(driverPath, url_items, crawlDT, k = 15)
-
