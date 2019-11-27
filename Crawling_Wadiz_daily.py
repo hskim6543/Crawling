@@ -61,7 +61,6 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
      
         for e in e_url:
             iRank = i
-            serial = f'{crawlDT:%y%m%d%H%M}-{i:0>2}'
 #             imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
 #                 (By.CSS_SELECTOR, f'{sel_cards} > div:nth-child({i}) > div')))
 #             imgTag =imgE.find_element_by_xpath('a/div/span').get_attribute('style')
@@ -69,6 +68,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             textTag = e.find_element_by_css_selector(
                 'div > div > div.RewardProjectCard_infoTop__1fX7c')
             url = textTag.find_element_by_xpath('a').get_attribute('href')
+            serial = f'{crawlDT:%y%m%d%H%M}{url[41:]:0>5}'
             title = tC.sub('',textTag.find_element_by_xpath('a/p/strong').text)
             category = textTag.find_element_by_xpath('div/span[1]').text
             maker = tC.sub('',textTag.find_element_by_xpath('div/span[2]').text)
@@ -212,7 +212,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         df_item = pd.DataFrame(itemInfo).sort_values(['rw_price','rw_name'])
         df_item['rwNo'] = list(map(
             lambda x: f'{x+1:0>2}', range(len(rw_name))))
-        df_item.serial = df_item.serial +'-'+ df_item.rwNo
+        df_item.serial = int(df_item.serial + df_item.rwNo)
         df_item.rwNo = list(map(lambda x : int(x),df_item.rwNo))
             
     ## Maker Info. DataFrame
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     
     print('='*20,'\n[Wadiz Planned Items, Makers Crawling]┐')
     print(f"{'└ ': >40}{crawlDT:<%Y-%m-%d %H:%M>}\n{'-':-<10}")
-    print(f"》 Base URL  : {url_items}")
+    print(f'》 Base URL  : {url_items}')
     print(f'》 Chrome Dir: {driverPath}')
     print(f'》 Saving Dir: {filePath}')
     
