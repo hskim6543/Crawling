@@ -68,7 +68,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
             textTag = e.find_element_by_css_selector(
                 'div > div > div.RewardProjectCard_infoTop__1fX7c')
             url = textTag.find_element_by_xpath('a').get_attribute('href')
-            serial = f'{crawlDT:%y%m%d%H%M}-{url[41:]:0>5}'
+            serial = f'{crawlDT:%y%m%d}-{url[41:]:0>5}'
             title = tC.sub('',textTag.find_element_by_xpath('a/p/strong').text)
             category = textTag.find_element_by_xpath('div/span[1]').text
             maker = tC.sub('',textTag.find_element_by_xpath('div/span[2]').text)
