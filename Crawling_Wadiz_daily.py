@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+
 from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -28,11 +29,11 @@ options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
  # to give the false appearance of real chrome user
 
 order='popluar' # sitePath: not typo
-catDic = {# '전체보기':'',
+catDic = {# '전체보기':'','기부·후원':312,
           '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
           '반려동물':308,'모임':313,'공연·컬쳐':294,'소셜·캠페인':295,'교육·키즈':309,
-          '게임·취미':292,'출판':293,'기부·후원':312}
+          '게임·취미':292,'출판':293}
 
 main = ['serial','category','iRank','title','url','maker'] #'img'
 info = ['timestamp','summary','percent','amount',
@@ -212,7 +213,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         df_item = pd.DataFrame(itemInfo).sort_values(['rw_price','rw_name'])
         df_item['rwNo'] = list(map(
             lambda x: f'{x+1:0>2}', range(len(rw_name))))
-        df_item.serial = int(df_item.serial +'-'+ df_item.rwNo)
+        df_item.serial = df_item.serial +'-'+ df_item.rwNo
         df_item.rwNo = list(map(lambda x : int(x),df_item.rwNo))
             
     ## Maker Info. DataFrame
@@ -272,7 +273,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
     finally:
         driver.quit()
         print(f"\n{'=':=<20}")
-        f_n = len(set(df_items.url.drop_duplicates()))
+        f_n = len(set(df_items.url))
         f_m = len(df_makers.maker) == len(set(df_items.maker))
         
         if not f_n == n:
@@ -296,7 +297,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
                 startrow = 1, freeze_panes = (2, 0), encoding='ms949')
         
         print(f"\nfile saved: {xlsx}")
-
+    
 #### Operation
 driverPath = 'C:/Users/siuser/Documents/Python Scripts/chromedriver'
 filePath = 'E:/# Work/# 190925~_Wadiz Crawling/raw/Daily/'
@@ -312,4 +313,5 @@ if __name__ == '__main__':
     print(f'》 Chrome Dir: {driverPath}')
     print(f'》 Saving Dir: {filePath}')
     
-    crawl_wadiz(driverPath, url_items, crawlDT, k = 15)
+    crawl_wadiz(driverPath, url_items, crawlDT, k = 5)
+
