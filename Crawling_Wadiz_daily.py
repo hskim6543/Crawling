@@ -28,7 +28,9 @@ options.add_argument('''user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)
     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36''')
  # to give the false appearance of real chrome user
 
-order='popluar' # sitePath: not typo
+order = 'recent'
+# order='popluar' # sitePath: not typo
+
 catDic = {# '전체보기':'','기부·후원':312,
           '테크·가전':287,'패션·잡화':288,'뷰티':311,'푸드':289,
           '홈리빙':310,'디자인소품':290,'여행·레저':296,'스포츠·모빌리티':297,
@@ -313,5 +315,5 @@ if __name__ == '__main__':
     print(f'》 Chrome Dir: {driverPath}')
     print(f'》 Saving Dir: {filePath}')
     
-    crawl_wadiz(driverPath, url_items, crawlDT, k = 5)
+    crawl_wadiz(driverPath, url_items, crawlDT, k = 30)
 
