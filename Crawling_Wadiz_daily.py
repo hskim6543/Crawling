@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# In[ ]:
+
+
 from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,8 +19,22 @@ InteractiveShell.ast_node_interactivity = "all" # for jupyter lab
 
 ### Webdriver Chrome Options
 options = Options()
+
+prefs = {'profile.default_content_setting_values':
+         {'cookies':2, 'images':2, 'plugins':2, 'popups':2, 'geolocation':2,
+          'notifications':2, 'auto_select_certificate':2, 'fullscreen':2,
+          'mouselock':2, 'mixed_script':2, 'media_stream':1, 'media_stream_mic':2,
+          'media_stream_camera':2, 'protocol_handlers':2, 'ppapi_broker':2,
+          'automatic_downloads':2, 'midi_sysex':2, 'push_messaging':2, 
+          'ssl_cert_decisions':2, 'metro_switch_to_desktop':2, 'durable_storage':2,
+          'protected_media_identifier':2, 'app_banner':2, 'site_engagement':2, 
+          }}
+
+options.add_experimental_option('prefs', prefs)
 options.add_argument('--headless')
 options.add_argument('--disable-gpu')
+options.add_argument('--disable-extensions')
+options.add_argument('--disable-infobars')
 options.add_argument('--window-size=1920x1080')
 options.add_argument('--lang=ko_KR')
 options.add_argument('--use-fake-ui-for-media-stream') # for media access permission
@@ -245,7 +262,7 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
     df_makers = pd.DataFrame()
 
     try:
-        driver = WD.Chrome(driverPath, chrome_options = options)
+        driver = WD.Chrome(driverPath) #, chrome_options = options)
         driver.maximize_window()
         driver.set_page_load_timeout(180)
         driver.implicitly_wait(2)
