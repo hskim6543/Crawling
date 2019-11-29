@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
 from selenium import webdriver as WD
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -56,12 +55,11 @@ def crawl_wadiz(driverPath, url_items, crawlDT, k=20):
         driver.get(url)
         driver.execute_script(f'window.scrollTo(0, {250 + 350 * k//3})')
         driver.implicitly_wait(3)
-        sel_cards = 'div.ProjectCardList_list__1YBa2'
         cards = WebDriverWait(driver, 30).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, sel_cards+f'> div:nth-child({k}) > div > div')))
-        e_url = driver.find_elements_by_css_selector(
-            sel_cards + '> div.ProjectCardList_item__1owJa > div')
-     
+            (By.CSS_SELECTOR, 'div.ProjectCardList_list__1YBa2')))
+        e_url = cards.find_elements_by_css_selector(
+            'div.ProjectCardList_item__1owJa > div')
+
         for e in e_url:
             iRank = i
 #             imgE = WebDriverWait(driver,10).until(EC.presence_of_element_located(
